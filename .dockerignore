@@ -1,2 +1,5 @@
 target/
 Dockerfile
+
+settings.yaml
+message-log.json
