@@ -1,0 +1,13 @@
+---
+
+environment:
+  webhook_url: "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  weight_bias: 0.5
+  user:
+    name: "username"
+    icon_url: "https://example.com/xxxxxxxx.png"
+
+messages:
+  - "message1"
+  - "message2"
+  - "message1"

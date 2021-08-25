@@ -1,5 +1,7 @@
 target/
 Dockerfile
+.gitignore
 
 settings.yaml
+settings.yaml.example
 message-log.json
