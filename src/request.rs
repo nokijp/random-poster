@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(PartialEq, Eq, Serialize, Debug)]
+#[derive(Serialize)]
 pub struct SimpleWebhookRequest {
     pub username: Option<String>,
     pub avatar_url: Option<String>,
@@ -8,7 +8,7 @@ pub struct SimpleWebhookRequest {
 }
 
 pub async fn post(webhook_url: &str, request: &SimpleWebhookRequest) -> Result<(), String> {
-    let content_json = serde_json::to_string(&request).map_err(|_| "unexpected failure during serialize request")?;
+    let content_json = serde_json::to_string(&request).unwrap();
 
     let client = reqwest::Client::new();
     let api_request = client.post(webhook_url)

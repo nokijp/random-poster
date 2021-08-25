@@ -3,15 +3,16 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-#[derive(PartialEq, Eq, Deserialize, Debug)]
+#[derive(PartialEq, Deserialize, Debug)]
 pub struct Settings {
     pub environment: EnvironmentSettings,
     pub messages: Vec<String>,
 }
 
-#[derive(PartialEq, Eq, Deserialize, Debug)]
+#[derive(PartialEq, Deserialize, Debug)]
 pub struct EnvironmentSettings {
     pub webhook_url: String,
+    pub weight_bias: f64,
     #[serde(rename = "user", default = "empty_user_settings")]
     pub user_settings: UserSettings,
 }
@@ -50,6 +51,7 @@ mod tests {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+                weight_bias: 2.0
                 user:
                     name: "user_name"
                     icon_url: "https://example.com/icon.png"
@@ -60,6 +62,7 @@ mod tests {
         let expected = Settings {
             environment: EnvironmentSettings {
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
+                weight_bias: 2.0,
                 user_settings: UserSettings {
                     name: Some("user_name".to_string()),
                     icon_url: Some("https://example.com/icon.png".to_string()),
@@ -79,6 +82,7 @@ mod tests {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+                weight_bias: 2.0
             messages:
                 - "abc"
                 - "def"
@@ -86,6 +90,7 @@ mod tests {
         let expected = Settings {
             environment: EnvironmentSettings {
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
+                weight_bias: 2.0,
                 user_settings: UserSettings {
                     name: None,
                     icon_url: None,
