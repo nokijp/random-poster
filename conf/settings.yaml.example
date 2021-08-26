@@ -2,12 +2,12 @@
 
 environment:
   webhook_url: "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  weight_bias: 0.5
-  user:
+  weight_bias: 0.5  # weight to pick the most posted messages
+  user:  # optional
     name: "username"
     icon_url: "https://example.com/xxxxxxxx.png"
 
-messages:
+messages:  # messages to post
   - "message1"
   - "message2"
   - "message1"

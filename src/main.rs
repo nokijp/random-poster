@@ -23,8 +23,8 @@ async fn main() {
 }
 
 async fn run() -> Result<(), String> {
-    let settings = read_settings("settings.yaml")?;
-    let mut random_picker = RandomPicker::from_log_file("message-log.json", settings.messages, settings.environment.weight_bias)?;
+    let settings = read_settings("conf/settings.yaml")?;
+    let mut random_picker = RandomPicker::from_log_file("conf/message-log.json", settings.messages, settings.environment.weight_bias)?;
 
     let message = random_picker.pick().clone();
     let content = SimpleWebhookRequest {

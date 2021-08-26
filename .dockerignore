@@ -1,7 +1,12 @@
-target/
-Dockerfile
+.git/
 .gitignore
+.dockerignore
+Dockerfile
+docker-compose.yaml
+.dev/
+.vscode/
 
-settings.yaml
-settings.yaml.example
-message-log.json
+README.md
+target/
+
+conf/

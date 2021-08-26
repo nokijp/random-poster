@@ -1,4 +1,6 @@
-/target
+.dev/
 
-settings.yaml
-message-log.json
+target/
+
+conf/settings.yaml
+conf/message-log.json

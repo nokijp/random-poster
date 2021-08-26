@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+  random-poster:
+    build: .
+    volumes:
+      - ./conf:/conf
