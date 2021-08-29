@@ -3,6 +3,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use super::random::InitialCountType;
+
 #[derive(PartialEq, Deserialize, Debug)]
 pub struct Settings {
     pub environment: EnvironmentSettings,
@@ -13,7 +15,9 @@ pub struct Settings {
 pub struct EnvironmentSettings {
     pub webhook_url: String,
     pub weight_bias: f64,
-    #[serde(rename = "user", default = "empty_user_settings")]
+    #[serde(default = "InitialCountType::default")]
+    pub initial_count_type: InitialCountType,
+    #[serde(rename = "user", default = "UserSettings::default")]
     pub user_settings: UserSettings,
 }
 
@@ -23,8 +27,10 @@ pub struct UserSettings {
     pub icon_url: Option<String>,
 }
 
-fn empty_user_settings() -> UserSettings {
-    UserSettings { name: None, icon_url: None }
+impl UserSettings {
+    fn default() -> UserSettings {
+        UserSettings { name: None, icon_url: None }
+    }
 }
 
 pub fn read_settings<P: AsRef<Path>>(path: P) -> Result<Settings, String> {
@@ -47,11 +53,12 @@ mod tests {
     use tempfile::NamedTempFile;
 
     #[test]
-    fn read_settings_can_read_a_yaml_file_which_contains_user_settings() {
+    fn read_settings_can_read_a_yaml_file_which_contains_all_settings() {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
                 weight_bias: 2.0
+                initial_count_type: "Min"
                 user:
                     name: "user_name"
                     icon_url: "https://example.com/icon.png"
@@ -63,6 +70,7 @@ mod tests {
             environment: EnvironmentSettings {
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
                 weight_bias: 2.0,
+                initial_count_type: InitialCountType::Min,
                 user_settings: UserSettings {
                     name: Some("user_name".to_string()),
                     icon_url: Some("https://example.com/icon.png".to_string()),
@@ -78,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn read_settings_can_read_a_yaml_file_which_does_not_contain_user_settings() {
+    fn read_settings_can_read_a_yaml_file_which_does_not_contain_optional_settings() {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
@@ -91,6 +99,7 @@ mod tests {
             environment: EnvironmentSettings {
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
                 weight_bias: 2.0,
+                initial_count_type: InitialCountType::Zero,
                 user_settings: UserSettings {
                     name: None,
                     icon_url: None,

@@ -21,8 +21,21 @@ struct RandomPickerItem<T> {
     count: u32,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Deserialize, Debug)]
+pub enum InitialCountType {
+    Zero,
+    Min,
+    Max,
+}
+
+impl InitialCountType {
+    pub fn default() -> InitialCountType {
+        InitialCountType::Zero
+    }
+}
+
 impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
-    pub fn from_log_file<P: AsRef<Path>>(path: P, values: Vec<T>, weight_bias: f64) -> Result<RandomPicker<T>, String> {
+    pub fn from_log_file<P: AsRef<Path>>(path: P, values: Vec<T>, weight_bias: f64, initial_count_type: InitialCountType) -> Result<RandomPicker<T>, String> {
         if values.is_empty() {
             return Err(String::from("values is empty"));
         }
@@ -44,9 +57,14 @@ impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
         let mut file_reader = BufReader::new(&mut file);
 
         let log: Vec<RandomPickerItem<T>> = serde_json::from_reader(&mut file_reader).map_err(|e| format!("failed to read log: {}", e))?;
+        let initial_count = match initial_count_type {
+            InitialCountType::Zero => 0,
+            InitialCountType::Min => log.iter().map(|item| item.count).min().unwrap_or(0),
+            InitialCountType::Max => log.iter().map(|item| item.count).max().unwrap_or(0),
+        };
         let log_map: HashMap<T, u32> = log.into_iter().map(|item| (item.value, item.count)).collect();
         let value_into_item = |value| {
-            let count = log_map.get(&value).map_or(0, |v| v.to_owned());
+            let count = log_map.get(&value).map_or(initial_count, |v| v.to_owned());
             RandomPickerItem {
                 value,
                 count,
@@ -106,32 +124,104 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         let log = indoc! {r#"
             [
-                { "value": "b", "count": 10 },
-                { "value": "c", "count": 2 },
-                { "value": "d", "count": 5 }
+                { "value": "a", "count": 10 },
+                { "value": "b", "count": 2 },
+                { "value": "c", "count": 5 }
             ]
         "#};
         write!(file, "{}", log).unwrap();
 
         let expected = vec![
-            RandomPickerItem {
-                value: String::from("a"),
-                count: 0,
-            },
-            RandomPickerItem {
-                value: String::from("b"),
-                count: 10,
-            },
-            RandomPickerItem {
-                value: String::from("c"),
-                count: 2,
-            },
+            RandomPickerItem { value: String::from("a"), count: 10 },
+            RandomPickerItem { value: String::from("b"), count: 2 },
+            RandomPickerItem { value: String::from("c"), count: 5 },
         ];
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker = RandomPicker::from_log_file(file.path(), values, 10.0).unwrap();
+        let picker = RandomPicker::from_log_file(file.path(), values, 10.0, InitialCountType::Zero).unwrap();
         assert_eq!(picker.items, expected);
     }
+
+    macro_rules! from_log_file_tests {
+        (
+            $(
+                $name:ident: $initial_count_type:expr, $log:expr, $values:expr, $expected:expr;
+            )*
+        ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let mut file = NamedTempFile::new().unwrap();
+                    write!(file, "{}", $log).unwrap();
+
+                    let picker = RandomPicker::from_log_file(file.path(), $values, 10.0, $initial_count_type).unwrap();
+                    assert_eq!(picker.items, $expected);
+                }
+            )*
+        }
+    }
+
+    from_log_file_tests!(
+        from_log_file_should_set_zero_to_initial_count_if_the_initial_count_type_is_min:
+            InitialCountType::Zero,
+            indoc! {r#"
+                [
+                    { "value": "a", "count": 1 },
+                    { "value": "b", "count": 2 },
+                    { "value": "c", "count": 3 }
+                ]
+            "#},
+            vec![String::from("b"), String::from("c"), String::from("d")],
+            vec![
+                RandomPickerItem { value: String::from("b"), count: 2 },
+                RandomPickerItem { value: String::from("c"), count: 3 },
+                RandomPickerItem { value: String::from("d"), count: 0 },
+            ];
+        from_log_file_should_set_the_minimum_value_of_the_log_to_initial_count_if_the_initial_count_type_is_min:
+            InitialCountType::Min,
+            indoc! {r#"
+                [
+                    { "value": "a", "count": 1 },
+                    { "value": "b", "count": 2 },
+                    { "value": "c", "count": 3 }
+                ]
+            "#},
+            vec![String::from("b"), String::from("c"), String::from("d")],
+            vec![
+                RandomPickerItem { value: String::from("b"), count: 2 },
+                RandomPickerItem { value: String::from("c"), count: 3 },
+                RandomPickerItem { value: String::from("d"), count: 1 },
+            ];
+        from_log_file_should_set_the_maximum_value_of_the_log_to_initial_count_if_the_initial_count_type_is_min: 
+            InitialCountType::Max,
+            indoc! {r#"
+                [
+                    { "value": "a", "count": 1 },
+                    { "value": "b", "count": 2 },
+                    { "value": "c", "count": 3 }
+                ]
+            "#},
+            vec![String::from("b"), String::from("c"), String::from("d")],
+            vec![
+                RandomPickerItem { value: String::from("b"), count: 2 },
+                RandomPickerItem { value: String::from("c"), count: 3 },
+                RandomPickerItem { value: String::from("d"), count: 3 },
+            ];
+        from_log_file_should_set_zero_if_the_log_is_empty_and_the_initial_count_type_is_min: 
+            InitialCountType::Min,
+            "[]",
+            vec![String::from("a")],
+            vec![
+                RandomPickerItem { value: String::from("a"), count: 0 },
+            ];
+        from_log_file_should_set_zero_if_the_log_is_empty_and_the_initial_count_type_is_max: 
+            InitialCountType::Max,
+            "[]",
+            vec![String::from("a")],
+            vec![
+                RandomPickerItem { value: String::from("a"), count: 0 },
+            ];
+    );
 
     #[test]
     fn from_log_file_should_return_a_random_picker_which_has_zero_initialized_items_if_the_log_file_does_not_exist() {
@@ -140,22 +230,13 @@ mod tests {
         file.close().unwrap();
 
         let expected = vec![
-            RandomPickerItem {
-                value: String::from("a"),
-                count: 0,
-            },
-            RandomPickerItem {
-                value: String::from("b"),
-                count: 0,
-            },
-            RandomPickerItem {
-                value: String::from("c"),
-                count: 0,
-            },
+            RandomPickerItem { value: String::from("a"), count: 0 },
+            RandomPickerItem { value: String::from("b"), count: 0 },
+            RandomPickerItem { value: String::from("c"), count: 0 },
         ];
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker = RandomPicker::from_log_file(path, values, 10.0).unwrap();
+        let picker = RandomPicker::from_log_file(path, values, 10.0, InitialCountType::Zero).unwrap();
         assert_eq!(picker.items, expected);
     }
 
@@ -165,7 +246,7 @@ mod tests {
         let path = file.path().to_owned();
         file.close().unwrap();
 
-        let result = RandomPicker::from_log_file(path, Vec::<String>::new(), 10.0);
+        let result = RandomPicker::from_log_file(path, Vec::<String>::new(), 10.0, InitialCountType::Zero);
         assert!(result.is_err());
     }
 
@@ -182,7 +263,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), 20.0).unwrap();
+        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), 20.0, InitialCountType::Zero).unwrap();
 
         let mut count: HashMap<String, u64> = values.into_iter().map(|s| (s, 0)).collect();
         for _ in 1..=10000 {
@@ -211,7 +292,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let mut picker = RandomPicker::from_log_file(file.path(), values, 0.0).unwrap();
+        let mut picker = RandomPicker::from_log_file(file.path(), values, 0.0, InitialCountType::Zero).unwrap();
 
         for _ in 1..=10 {
             let value = picker.pick();
@@ -226,7 +307,7 @@ mod tests {
         file.close().unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let mut picker = RandomPicker::from_log_file(path, values.clone(), 0.0).unwrap();
+        let mut picker = RandomPicker::from_log_file(path, values.clone(), 0.0, InitialCountType::Zero).unwrap();
         let value = picker.pick();
         assert!(values.iter().any(|s| s == value));
     }
@@ -244,7 +325,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), f64::INFINITY).unwrap();
+        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), f64::INFINITY, InitialCountType::Zero).unwrap();
 
         let mut count: HashMap<String, u64> = values.into_iter().map(|s| (s, 0)).collect();
         for _ in 1..=10000 {

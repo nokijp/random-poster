@@ -3,7 +3,8 @@
 environment:
   webhook_url: "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   weight_bias: 0.5  # weight to pick the most posted messages
-  user:  # optional
+  initial_count_type: "Min"  # [OPTIONAL] type of initial count value for new messages (Zero, Min or Max)
+  user:  # [OPTIONAL]
     name: "username"
     icon_url: "https://example.com/xxxxxxxx.png"
 
