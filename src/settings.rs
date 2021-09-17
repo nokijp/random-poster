@@ -4,6 +4,7 @@ use std::io::BufReader;
 use std::path::Path;
 
 use super::random::InitialCountType;
+use super::weight::WeightType;
 
 #[derive(PartialEq, Deserialize, Debug)]
 pub struct Settings {
@@ -14,7 +15,7 @@ pub struct Settings {
 #[derive(PartialEq, Deserialize, Debug)]
 pub struct EnvironmentSettings {
     pub webhook_url: String,
-    pub weight_bias: f64,
+    pub weight_type: WeightType,
     #[serde(default = "InitialCountType::default")]
     pub initial_count_type: InitialCountType,
     #[serde(rename = "user", default = "UserSettings::default")]
@@ -57,7 +58,8 @@ mod tests {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_bias: 2.0
+                weight_type:
+                    type: "Uniform"
                 initial_count_type: "Min"
                 user:
                     name: "user_name"
@@ -68,17 +70,17 @@ mod tests {
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
-                weight_bias: 2.0,
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::Uniform,
                 initial_count_type: InitialCountType::Min,
                 user_settings: UserSettings {
-                    name: Some("user_name".to_string()),
-                    icon_url: Some("https://example.com/icon.png".to_string()),
+                    name: Some(String::from("user_name")),
+                    icon_url: Some(String::from("https://example.com/icon.png")),
                 },
             },
             messages: vec![
-                "abc".to_string(),
-                "def".to_string(),
+                String::from("abc"),
+                String::from("def"),
             ],
         };
 
@@ -90,15 +92,16 @@ mod tests {
         let input = indoc! {r#"
             environment:
                 webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_bias: 2.0
+                weight_type:
+                    type: "Uniform"
             messages:
                 - "abc"
                 - "def"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY".to_string(),
-                weight_bias: 2.0,
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::Uniform,
                 initial_count_type: InitialCountType::Zero,
                 user_settings: UserSettings {
                     name: None,
@@ -106,8 +109,100 @@ mod tests {
                 },
             },
             messages: vec![
-                "abc".to_string(),
-                "def".to_string(),
+                String::from("abc"),
+                String::from("def"),
+            ],
+        };
+
+        assert_eq!(Ok(expected), from_str(input));
+    }
+
+    #[test]
+    fn read_settings_can_read_min_only_weight() {
+        let input = indoc! {r#"
+            environment:
+                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+                weight_type:
+                    type: "MinOnly"
+            messages:
+                - "abc"
+                - "def"
+        "#};
+        let expected = Settings {
+            environment: EnvironmentSettings {
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::MinOnly,
+                initial_count_type: InitialCountType::Zero,
+                user_settings: UserSettings {
+                    name: None,
+                    icon_url: None,
+                },
+            },
+            messages: vec![
+                String::from("abc"),
+                String::from("def"),
+            ],
+        };
+
+        assert_eq!(Ok(expected), from_str(input));
+    }
+
+    #[test]
+    fn read_settings_can_read_linear_weight() {
+        let input = indoc! {r#"
+            environment:
+                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+                weight_type:
+                    type: "Linear"
+                    bias: 10.0
+            messages:
+                - "abc"
+                - "def"
+        "#};
+        let expected = Settings {
+            environment: EnvironmentSettings {
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::Linear { bias: 10.0 },
+                initial_count_type: InitialCountType::Zero,
+                user_settings: UserSettings {
+                    name: None,
+                    icon_url: None,
+                },
+            },
+            messages: vec![
+                String::from("abc"),
+                String::from("def"),
+            ],
+        };
+
+        assert_eq!(Ok(expected), from_str(input));
+    }
+
+    #[test]
+    fn read_settings_can_read_boltzmann_weight() {
+        let input = indoc! {r#"
+            environment:
+                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+                weight_type:
+                    type: "Boltzmann"
+                    beta: 10.0
+            messages:
+                - "abc"
+                - "def"
+        "#};
+        let expected = Settings {
+            environment: EnvironmentSettings {
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::Boltzmann { beta: 10.0 },
+                initial_count_type: InitialCountType::Zero,
+                user_settings: UserSettings {
+                    name: None,
+                    icon_url: None,
+                },
+            },
+            messages: vec![
+                String::from("abc"),
+                String::from("def"),
             ],
         };
 

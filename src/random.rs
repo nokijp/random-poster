@@ -8,11 +8,13 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
+use super::weight::WeightType;
+
 #[derive(Clone)]
 pub struct RandomPicker<T> {
     items: Vec<RandomPickerItem<T>>,
     path: PathBuf,
-    weight_bias: f64,
+    weight_type: WeightType,
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize, Debug)]
@@ -35,12 +37,12 @@ impl InitialCountType {
 }
 
 impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
-    pub fn from_log_file<P: AsRef<Path>>(path: P, values: Vec<T>, weight_bias: f64, initial_count_type: InitialCountType) -> Result<RandomPicker<T>, String> {
+    pub fn from_log_file<P: AsRef<Path>>(path: P, values: Vec<T>, weight_type: WeightType, initial_count_type: InitialCountType) -> Result<RandomPicker<T>, String> {
         if values.is_empty() {
             return Err(String::from("values is empty"));
         }
-        if weight_bias.is_nan() || weight_bias < 0.0 {
-            return Err(String::from("weight_bias must be positive"));
+        if let Err(message) = weight_type.validate() {
+            return Err(String::from(message));
         }
 
         let path_buf = path.as_ref().to_owned();
@@ -49,7 +51,7 @@ impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
             return Ok(RandomPicker {
                 items,
                 path: path_buf,
-                weight_bias,
+                weight_type,
             });
         }
 
@@ -75,7 +77,7 @@ impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
         Ok(RandomPicker {
             items,
             path: path_buf,
-            weight_bias,
+            weight_type,
         })
     }
 
@@ -88,8 +90,7 @@ impl<T: Hash + Eq + Serialize + DeserializeOwned> RandomPicker<T> {
 
     pub fn pick(&mut self) -> &T {
         let counts: Vec<u32> = self.items.iter().map(|item| item.count).collect();
-        let max_count = counts.iter().max().unwrap();
-        let raw_weights: Vec<f64> = counts.iter().map(|count| (max_count - *count) as f64 + self.weight_bias).collect();
+        let raw_weights = self.weight_type.get_weights(&counts);
         let weights = if raw_weights.iter().any(|w| w.is_infinite()) {
             raw_weights.iter().map(|w| if w.is_infinite() { 1.0 } else { 0.0 }).collect()
         } else if raw_weights.iter().all(|w| *w == 0.0) {
@@ -138,7 +139,7 @@ mod tests {
         ];
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker = RandomPicker::from_log_file(file.path(), values, 10.0, InitialCountType::Zero).unwrap();
+        let picker = RandomPicker::from_log_file(file.path(), values, WeightType::Uniform, InitialCountType::Zero).unwrap();
         assert_eq!(picker.items, expected);
     }
 
@@ -154,7 +155,7 @@ mod tests {
                     let mut file = NamedTempFile::new().unwrap();
                     write!(file, "{}", $log).unwrap();
 
-                    let picker = RandomPicker::from_log_file(file.path(), $values, 10.0, $initial_count_type).unwrap();
+                    let picker = RandomPicker::from_log_file(file.path(), $values, WeightType::Uniform, $initial_count_type).unwrap();
                     assert_eq!(picker.items, $expected);
                 }
             )*
@@ -236,7 +237,7 @@ mod tests {
         ];
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker = RandomPicker::from_log_file(path, values, 10.0, InitialCountType::Zero).unwrap();
+        let picker = RandomPicker::from_log_file(path, values, WeightType::Uniform, InitialCountType::Zero).unwrap();
         assert_eq!(picker.items, expected);
     }
 
@@ -246,7 +247,7 @@ mod tests {
         let path = file.path().to_owned();
         file.close().unwrap();
 
-        let result = RandomPicker::from_log_file(path, Vec::<String>::new(), 10.0, InitialCountType::Zero);
+        let result = RandomPicker::from_log_file(path, Vec::<String>::new(), WeightType::Uniform, InitialCountType::Zero);
         assert!(result.is_err());
     }
 
@@ -263,7 +264,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), 20.0, InitialCountType::Zero).unwrap();
+        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), WeightType::Linear { bias: 20.0 }, InitialCountType::Zero).unwrap();
 
         let mut count: HashMap<String, u64> = values.into_iter().map(|s| (s, 0)).collect();
         for _ in 1..=10000 {
@@ -292,7 +293,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let mut picker = RandomPicker::from_log_file(file.path(), values, 0.0, InitialCountType::Zero).unwrap();
+        let mut picker = RandomPicker::from_log_file(file.path(), values, WeightType::Linear { bias: 0.0 }, InitialCountType::Zero).unwrap();
 
         for _ in 1..=10 {
             let value = picker.pick();
@@ -307,7 +308,7 @@ mod tests {
         file.close().unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let mut picker = RandomPicker::from_log_file(path, values.clone(), 0.0, InitialCountType::Zero).unwrap();
+        let mut picker = RandomPicker::from_log_file(path, values.clone(), WeightType::Linear { bias: 0.0 }, InitialCountType::Zero).unwrap();
         let value = picker.pick();
         assert!(values.iter().any(|s| s == value));
     }
@@ -325,7 +326,7 @@ mod tests {
         write!(file, "{}", log).unwrap();
 
         let values = vec![String::from("a"), String::from("b"), String::from("c")];
-        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), f64::INFINITY, InitialCountType::Zero).unwrap();
+        let picker_template = RandomPicker::from_log_file(file.path(), values.clone(), WeightType::Linear { bias: f64::INFINITY }, InitialCountType::Zero).unwrap();
 
         let mut count: HashMap<String, u64> = values.into_iter().map(|s| (s, 0)).collect();
         for _ in 1..=10000 {

@@ -5,9 +5,10 @@ extern crate serde_json;
 extern crate serde_yaml;
 extern crate tokio;
 
-mod settings;
 mod random;
 mod request;
+mod settings;
+mod weight;
 
 use settings::read_settings;
 use random::RandomPicker;
@@ -28,7 +29,7 @@ async fn run() -> Result<(), String> {
         RandomPicker::from_log_file(
             "conf/message-log.json",
             settings.messages,
-            settings.environment.weight_bias,
+            settings.environment.weight_type,
             settings.environment.initial_count_type,
         )?;
 
