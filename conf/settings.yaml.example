@@ -2,13 +2,25 @@
 
 environment:
   webhook_url: "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  weight_bias: 0.5  # weight to pick the most posted messages
+  weight_type:
+    type: "Boltzmann"  # one of [Uniform, MinOnly, Linear, Boltzmann]
+    beta: 2.0
   initial_count_type: "Min"  # [OPTIONAL] type of initial count value for new messages (Zero, Min or Max)
   user:  # [OPTIONAL]
     name: "username"
     icon_url: "https://example.com/xxxxxxxx.png"
 
 messages:  # messages to post
-  - "message1"
-  - "message2"
-  - "message1"
+  message1: "message1"
+  message2:
+    content: "message2"
+    embeds:
+      - title: "title1"
+        url: "https://example.com/1"
+        thumbnail:
+          url: "https://example.com/thumbnail1.png"
+      - title: "title2"
+        url: "https://example.com/2"
+        thumbnail:
+          url: "https://example.com/thumbnail2.png"
+  message3: "message3"

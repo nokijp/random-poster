@@ -1,14 +1,17 @@
 use serde::Serialize;
 
+use super::message::Message;
+
 #[derive(Serialize)]
-pub struct SimpleWebhookRequest {
-    pub username: Option<String>,
-    pub avatar_url: Option<String>,
-    pub content: String,
+pub struct SimpleWebhookRequest<'a> {
+    pub username: &'a Option<String>,
+    pub avatar_url: &'a Option<String>,
+    #[serde(flatten)]
+    pub message: &'a Message,
 }
 
-pub async fn post(webhook_url: &str, request: &SimpleWebhookRequest) -> Result<(), String> {
-    let content_json = serde_json::to_string(&request).unwrap();
+pub async fn post(webhook_url: &str, request: &SimpleWebhookRequest<'_>) -> Result<(), String> {
+    let content_json = serde_json::to_string(request).unwrap();
 
     let client = reqwest::Client::new();
     let api_request = client.post(webhook_url)

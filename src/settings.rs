@@ -1,15 +1,17 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
 use super::random::InitialCountType;
 use super::weight::WeightType;
+use super::message::Message;
 
 #[derive(PartialEq, Deserialize, Debug)]
 pub struct Settings {
     pub environment: EnvironmentSettings,
-    pub messages: Vec<String>,
+    pub messages: HashMap<String, Message>,
 }
 
 #[derive(PartialEq, Deserialize, Debug)]
@@ -57,16 +59,16 @@ mod tests {
     fn read_settings_can_read_a_yaml_file_which_contains_all_settings() {
         let input = indoc! {r#"
             environment:
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_type:
-                    type: "Uniform"
-                initial_count_type: "Min"
-                user:
-                    name: "user_name"
-                    icon_url: "https://example.com/icon.png"
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "Uniform"
+              initial_count_type: "Min"
+              user:
+                name: "user_name"
+                icon_url: "https://example.com/icon.png"
             messages:
-                - "abc"
-                - "def"
+              abc: "message1"
+              def: "message2"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
@@ -79,9 +81,9 @@ mod tests {
                 },
             },
             messages: vec![
-                String::from("abc"),
-                String::from("def"),
-            ],
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::String(String::from("message2"))),
+            ].into_iter().collect(),
         };
 
         assert_eq!(Ok(expected), from_str(input));
@@ -91,12 +93,12 @@ mod tests {
     fn read_settings_can_read_a_yaml_file_which_does_not_contain_optional_settings() {
         let input = indoc! {r#"
             environment:
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_type:
-                    type: "Uniform"
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "Uniform"
             messages:
-                - "abc"
-                - "def"
+              abc: "message1"
+              def: "message2"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
@@ -109,9 +111,9 @@ mod tests {
                 },
             },
             messages: vec![
-                String::from("abc"),
-                String::from("def"),
-            ],
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::String(String::from("message2"))),
+            ].into_iter().collect(),
         };
 
         assert_eq!(Ok(expected), from_str(input));
@@ -121,12 +123,12 @@ mod tests {
     fn read_settings_can_read_min_only_weight() {
         let input = indoc! {r#"
             environment:
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_type:
-                    type: "MinOnly"
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "MinOnly"
             messages:
-                - "abc"
-                - "def"
+              abc: "message1"
+              def: "message2"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
@@ -139,9 +141,9 @@ mod tests {
                 },
             },
             messages: vec![
-                String::from("abc"),
-                String::from("def"),
-            ],
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::String(String::from("message2"))),
+            ].into_iter().collect(),
         };
 
         assert_eq!(Ok(expected), from_str(input));
@@ -151,13 +153,13 @@ mod tests {
     fn read_settings_can_read_linear_weight() {
         let input = indoc! {r#"
             environment:
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_type:
-                    type: "Linear"
-                    bias: 10.0
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "Linear"
+                bias: 10.0
             messages:
-                - "abc"
-                - "def"
+              abc: "message1"
+              def: "message2"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
@@ -170,9 +172,9 @@ mod tests {
                 },
             },
             messages: vec![
-                String::from("abc"),
-                String::from("def"),
-            ],
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::String(String::from("message2"))),
+            ].into_iter().collect(),
         };
 
         assert_eq!(Ok(expected), from_str(input));
@@ -182,13 +184,13 @@ mod tests {
     fn read_settings_can_read_boltzmann_weight() {
         let input = indoc! {r#"
             environment:
-                webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
-                weight_type:
-                    type: "Boltzmann"
-                    beta: 10.0
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "Boltzmann"
+                beta: 10.0
             messages:
-                - "abc"
-                - "def"
+              abc: "message1"
+              def: "message2"
         "#};
         let expected = Settings {
             environment: EnvironmentSettings {
@@ -201,9 +203,67 @@ mod tests {
                 },
             },
             messages: vec![
-                String::from("abc"),
-                String::from("def"),
-            ],
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::String(String::from("message2"))),
+            ].into_iter().collect(),
+        };
+
+        assert_eq!(Ok(expected), from_str(input));
+    }
+
+    #[test]
+    fn read_settings_can_read_mixed_messages() {
+        let input = indoc! {r#"
+            environment:
+              webhook_url: "https://discord.com/api/webhooks/XXXX/YYYY"
+              weight_type:
+                type: "Uniform"
+            messages:
+              abc: "message1"
+              def:
+                content: "message2"
+                embeds:
+                  - title: "title1"
+                    url: "https://example.com/1"
+                    thumbnail:
+                      url: "https://example.com/thumbnail1.png"
+                  - title: "title2"
+                    url: "https://example.com/2"
+                    thumbnail:
+                      url: "https://example.com/thumbnail2.png"
+        "#};
+        let expected = Settings {
+            environment: EnvironmentSettings {
+                webhook_url: String::from("https://discord.com/api/webhooks/XXXX/YYYY"),
+                weight_type: WeightType::Uniform,
+                initial_count_type: InitialCountType::Zero,
+                user_settings: UserSettings {
+                    name: None,
+                    icon_url: None,
+                },
+            },
+            messages: vec![
+                (String::from("abc"), Message::String(String::from("message1"))),
+                (String::from("def"), Message::WithEmbeds {
+                    content: Some(String::from("message2")),
+                    embeds: vec![
+                        serde_json::json!({
+                            "title": "title1",
+                            "url": "https://example.com/1",
+                            "thumbnail": {
+                                "url": "https://example.com/thumbnail1.png",
+                            },
+                        }),
+                        serde_json::json!({
+                            "title": "title2",
+                            "url": "https://example.com/2",
+                            "thumbnail": {
+                                "url": "https://example.com/thumbnail2.png",
+                            },
+                        }),
+                    ],
+                }),
+            ].into_iter().collect(),
         };
 
         assert_eq!(Ok(expected), from_str(input));
